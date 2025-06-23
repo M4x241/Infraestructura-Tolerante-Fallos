@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aplicación de Encuestas</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans">
+  <div class="container mx-auto p-4">
+    <h1 class="text-3xl font-bold text-center mb-6">Aplicación de Encuestas</h1>
+
+    <!-- Sección para crear usuario -->
+    <div class="mb-8">
+      <h2 class="text-2xl font-semibold mb-4">Crear Usuario</h2>
+      <div class="flex gap-4">
+        <input id="nombre" type="text" placeholder="Nombre" class="border p-2 rounded">
+        <input id="email" type="email" placeholder="Email" class="border p-2 rounded">
+        <button onclick="crearUsuario()" class="bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Crear</button>
+      </div>
+    </div>
+
+    <!-- Sección para crear encuesta -->
+    <div class="mb-8">
+      <h2 class="text-2xl font-semibold mb-4">Crear Encuesta</h2>
+      <div class="flex flex-col gap-4">
+        <input id="usuario_id" type="number" placeholder="ID del usuario" class="border p-2 rounded">
+        <input id="pregunta" type="text" placeholder="Pregunta" class="border p-2 rounded">
+        <input id="opciones" type="text" placeholder="Opciones (ej. Roja,Azul,Verde)" class="border p-2 rounded">
+        <button onclick="crearEncuesta()" class="bg-green-500 text-white p-2 rounded hover:bg-green-600">Crear Encuesta</button>
+      </div>
+    </div>
+
+    <!-- Sección para listar encuestas -->
+    <div class="mb-8">
+      <h2 class="text-2xl font-semibold mb-4">Encuestas Disponibles</h2>
+      <div id="listaEncuestas" class="grid gap-4"></div>
+    </div>
+
+    <!-- Sección para resultados -->
+    <div class="mb-8">
+      <h2 class="text-2xl font-semibold mb-4">Resultados de Encuesta</h2>
+      <input id="encuesta_id" type="number" placeholder="ID de la encuesta" class="border p-2 rounded">
+      <button onclick="verResultados()" class="bg-purple-500 text-white p-2 rounded hover:bg-purple-600">Ver Resultados</button>
+      <div id="resultados" class="mt-4"></div>
+    </div>
+  </div>
+
+  <script>
+    // Función para crear un usuario
+    async function crearUsuario() {
+      const nombre = document.getElementById('nombre').value;
+      const email = document.getElementById('email').value;
+      try {
+        const response = await fetch('/api/usuarios', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nombre, email })
+        });
+        if (response.ok) {
+          alert('Usuario creado con éxito');
+          document.getElementById('nombre').value = '';
+          document.getElementById('email').value = '';
+        } else {
+          alert('Error al crear usuario');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Error en la solicitud');
+      }
+    }
+
+    // Función para crear una encuesta
+    async function crearEncuesta() {
+      const usuario_id = document.getElementById('usuario_id').value;
+      const pregunta = document.getElementById('pregunta').value;
+      const opcionesInput = document.getElementById('opciones').value.split(',').map(opt => opt.trim());
+      const opciones = opcionesInput.reduce((acc, opt) => ({ ...acc, [opt]: 0 }), {});
+      try {
+        const response = await fetch('/api/encuestas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ usuario_id, pregunta, opciones })
+        });
+        if (response.ok) {
+          alert('Encuesta creada con éxito');
+          document.getElementById('usuario_id').value = '';
+          document.getElementById('pregunta').value = '';
+          document.getElementById('opciones').value = '';
+          cargarEncuestas();
+        } else {
+          alert('Error al crear encuesta');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Error en la solicitud');
+      }
+    }
+
+    // Función para cargar y mostrar encuestas
+    async function cargarEncuestas() {
+      try {
+        const response = await fetch('/api/encuestas');
+        const encuestas = await response.json();
+        const lista = document.getElementById('listaEncuestas');
+        lista.innerHTML = '';
+        encuestas.forEach(encuesta => {
+          const div = document.createElement('div');
+          div.className = 'border p-4 rounded bg-white';
+          div.innerHTML = `
+            <p><strong>ID:</strong> ${encuesta.id}</p>
+            <p><strong>Pregunta:</strong> ${encuesta.pregunta}</p>
+            <p><strong>Opciones:</strong></p>
+            <ul>
+              ${Object.keys(encuesta.opciones).map(opcion => `
+                <li>
+                  ${opcion}
+                  <button onclick="votar(${encuesta.id}, '${opcion}')" class="bg-yellow-500 text-white p-1 rounded hover:bg-yellow-600 ml-2">Votar</button>
+                </li>
+              `).join('')}
+            </ul>
+          `;
+          lista.appendChild(div);
+        });
+      } catch (err) {
+        console.error(err);
+        alert('Error al cargar encuestas');
+      }
+    }
+
+    // Función para votar
+    async function votar(encuestaId, opcion) {
+      try {
+        const response = await fetch(`/api/encuestas/${encuestaId}/votar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ opcion })
+        });
+        if (response.ok) {
+          alert('Voto registrado');
+          cargarEncuestas();
+        } else {
+          alert('Error al votar');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Error en la solicitud');
+      }
+    }
+
+    // Función para ver resultados
+    async function verResultados() {
+      const encuesta_id = document.getElementById('encuesta_id').value;
+      try {
+        const response = await fetch(`/api/encuestas/${encuesta_id}/resultados`);
+        const resultados = await response.json();
+        const div = document.getElementById('resultados');
+        div.innerHTML = `
+          <h3 class="text-xl font-semibold mb-2">Resultados:</h3>
+          <ul>
+            ${Object.entries(resultados).map(([opcion, votos]) => `
+              <li>${opcion}: ${votos} votos</li>
+            `).join('')}
+          </ul>
+        `;
+      } catch (err) {
+        console.error(err);
+        div.innerHTML = '<p class="text-red-500">Error al cargar resultados</p>';
+      }
+    }
+
+    // Cargar encuestas al iniciar
+    cargarEncuestas();
+  </script>
+</body>
+</html>
